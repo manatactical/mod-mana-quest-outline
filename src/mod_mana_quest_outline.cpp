@@ -218,7 +218,7 @@ namespace
             std::string body = "S:";
             uint32      sent = 0;
 
-            player->DoForAllVisibleWorldObjects([&, this](WorldObject* object)
+            player->DoForAllVisibleWorldObjects([&](WorldObject* object)
             {
                 if (sent >= g_config.maxCount)
                     return;
