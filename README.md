@@ -33,9 +33,9 @@ Notes on the shape:
 - **Two hex halves, not one 64-bit number.** The client-side script engine is Lua 5.1, where every
   number is a double; a packed 64-bit GUID cannot survive it. The halves are sent separately and the
   client joins them, exactly as it reads a GUID from the client's own object header.
-- **`S:` only ever means replace.** The module re-sends the full set on a timer
-  (`ManaQuestOutline.IntervalMs`) and never sends a delta, so a sync the client's chat layer drops or
-  limits is corrected by the next one and there is no client-side accumulation to keep consistent.
+- **`S:` only ever means replace.** The module re-resolves the set on movement and on the idle timer
+  and never sends a delta, so a sync the client's chat layer drops or limits is corrected by the next
+  resend and there is no client-side accumulation to keep consistent.
 - **Append only.** Fields may be appended over time; an older client that cannot parse the tail keeps
   every field it does understand, so the two halves are only ever extended, never reordered or
   renumbered.
@@ -48,11 +48,17 @@ The statuses filtered through are the available and turn-in ones:
 
 | Sent | `DIALOG_STATUS_*` |
 |---|---|
-| available | `AVAILABLE` (8), `AVAILABLE_REP` (7), `LOW_LEVEL_AVAILABLE` (2), `LOW_LEVEL_AVAILABLE_REP` (4) |
-| turn-in | `REWARD` (10), `REWARD2` (9), `REWARD_REP` (6), `LOW_LEVEL_REWARD_REP` (3) |
+| available | `AVAILABLE` (8), `AVAILABLE_REP` (7) |
+| turn-in | `REWARD` (10), `REWARD2` (9), `REWARD_REP` (6) |
 
 `UNAVAILABLE` (1), `NONE` (0) and `INCOMPLETE` (5) are dropped. This is both the requested behaviour
 and what keeps the body small, because the client outlines everything it is told about.
+
+The three **_LOW_LEVEL_ variants (2, 3, 4) are dropped too.** The server sets one when every quest the
+giver has is far below the player: `GetQuestDialogStatus` keeps the highest status over all of them,
+so a giver with one ordinary quest still reports `AVAILABLE`/`REWARD` and still gets an outline. A
+giver whose only quests are low-level ones therefore gets none, which is the wanted behaviour and
+needs no client-side setting.
 
 ## Settings
 
@@ -61,8 +67,10 @@ All in `conf/mod-mana-quest-outline.conf.dist`:
 | Key | Default | Meaning |
 |---|---|---|
 | `ManaQuestOutline.Enable` | `1` | master switch |
-| `ManaQuestOutline.IntervalMs` | `4000` | full resend cadence; clamped to a 500 ms floor |
-| `ManaQuestOutline.MaxPerSync` | `48` | givers per sync; the walk stops at the cap |
+| `ManaQuestOutline.PollIntervalMs` | `250` | floor between two movement-driven re-resolves of one player's set; clamped to 100 |
+| `ManaQuestOutline.IdleIntervalMs` | `3000` | unconditional resend cadence, the safety net for changes no movement reports |
+| `ManaQuestOutline.MoveDistance` | `5.0` | yards a player must move before movement polls the set again |
+| `ManaQuestOutline.MaxPerSync` | `48` | givers per sync; the walk stops collecting at the cap |
 
 ## Install
 
@@ -73,8 +81,24 @@ so the module also runs with the file absent.
 
 ## Cost
 
-The sync is one visibility walk and one `GetQuestDialogStatus` per visible quest giver, at
-`IntervalMs` — not per tick, and not per player tick. The walk is capped at `MaxPerSync` givers.
+The sync is change-driven, not a per-player timer:
+
+- An **idle** player is never walked: `OnPlayerBeforeUpdate` compares their position against the one
+  recorded with the last resolve and does nothing until they have covered `MoveDistance`. That is two
+  ms subtractions and two float compares per update.
+- A **moving** player is resolved at most once per `PollIntervalMs` (250 ms), and only then does the
+  visibility walk and one `GetQuestDialogStatus` per visible quest giver run.
+- The resulting set is compared with the last one sent and **not sent when unchanged**, so walking
+  around a hub that is already outlined costs no traffic at all.
+- `IdleIntervalMs` (3 s) forces a resend anyway, which covers the changes that no movement reports:
+  handing a quest in, crossing a level or reputation threshold. A dropped message is corrected by that
+  same cadence.
+- A **zone change or teleport** resolves immediately, since the movement poll's window would otherwise
+  hide it.
+
+The work is per player and only for players in the world, so an empty or idle realm costs one clock
+read per world tick. The walk stops collecting at `MaxPerSync` givers; note that it still visits every
+visible object to find out which ones are givers, so the cap bounds the packet, not the iteration.
 
 ## Paired with
 

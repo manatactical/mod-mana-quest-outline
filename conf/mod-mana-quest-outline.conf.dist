@@ -25,23 +25,46 @@
 ManaQuestOutline.Enable = 1
 
 #
-#    ManaQuestOutline.IntervalMs
-#        Description: How often, in milliseconds, the full set of visible quest givers is re-sent to
-#                     each player. The client holds the last set between syncs, so this only bounds
-#                     how stale it can be; the module also sends nothing but the set itself, which
-#                     means a dropped sync is corrected by the next one. Values below 500 are raised
-#                     to 500.
-#        Default:     4000
+#    ManaQuestOutline.PollIntervalMs
+#        Description: How often, in milliseconds, a *moving* player's visible set may be re-resolved.
+#                     This is what bounds the snappiness: a giver is outlined within this long of being
+#                     walked into view. It is a floor, not a cadence -- an idle player is never
+#                     re-resolved, and a player who is not moving is covered by the idle resend below.
+#                     The send is skipped entirely when the set is unchanged, so lowering this costs
+#                     CPU, not bandwidth. Values below 100 are raised to 100.
+#        Default:     250
 #
 
-ManaQuestOutline.IntervalMs = 4000
+ManaQuestOutline.PollIntervalMs = 250
+
+#
+#    ManaQuestOutline.IdleIntervalMs
+#        Description: Unconditional resend cadence, in milliseconds, on top of the movement poll. It is
+#                     the safety net for the changes no movement reports: a quest handed in, a level or
+#                     reputation threshold crossed, an NPC phasing in on top of the player. Must be at
+#                     least PollIntervalMs; values below it are raised.
+#        Default:     3000
+#
+
+ManaQuestOutline.IdleIntervalMs = 3000
+
+#
+#    ManaQuestOutline.MoveDistance
+#        Description: How far, in yards, a player must have moved since their set was last resolved
+#                     before movement triggers a new poll. Raising it makes a player who paces about
+#                     cost less; lowering it makes small steps re-resolve sooner. 0 re-resolves on any
+#                     movement report (down to the poll floor).
+#        Default:     5.0
+#
+
+ManaQuestOutline.MoveDistance = 5.0
 
 #
 #    ManaQuestOutline.MaxPerSync
 #        Description: Most quest givers sent in one sync. A busy hub has more givers in view than the
 #                     client will ever outline, and every extra field grows the addon message, so the
-#                     walk stops once this many are collected. Raise it only if a crowded city keeps
-#                     dropping givers you wanted.
+#                     walk stops collecting once this many are collected. Raise it only if a crowded
+#                     city keeps dropping givers you wanted.
 #        Default:     48
 #
 
