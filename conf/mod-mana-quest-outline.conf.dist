@@ -1,0 +1,48 @@
+#
+# mod-mana-quest-outline configuration
+#
+# Server-side companion to the client's wxl-mana-unit-outline module. This module tells that module
+# which visible units are quest givers and what kind of quest they hold, so the client can outline
+# them without the player pointing at them. The client's own UI has no quest state for a unit that is
+# merely nearby, and stock 3.3.5a has no C_QuestLog.GetUnitQuestInfo, so the answer has to come from
+# here.
+#
+
+[worldserver]
+
+########################################
+# The questgiver sync
+########################################
+
+#
+#    ManaQuestOutline.Enable
+#        Description: Enable the module. With 0 the client module simply never hears about quest
+#                     givers and only outlines the mouseover and target unit as before.
+#        Default:     1 - Enabled
+#                     0 - Disabled
+#
+
+ManaQuestOutline.Enable = 1
+
+#
+#    ManaQuestOutline.IntervalMs
+#        Description: How often, in milliseconds, the full set of visible quest givers is re-sent to
+#                     each player. The client holds the last set between syncs, so this only bounds
+#                     how stale it can be; the module also sends nothing but the set itself, which
+#                     means a dropped sync is corrected by the next one. Values below 500 are raised
+#                     to 500.
+#        Default:     4000
+#
+
+ManaQuestOutline.IntervalMs = 4000
+
+#
+#    ManaQuestOutline.MaxPerSync
+#        Description: Most quest givers sent in one sync. A busy hub has more givers in view than the
+#                     client will ever outline, and every extra field grows the addon message, so the
+#                     walk stops once this many are collected. Raise it only if a crowded city keeps
+#                     dropping givers you wanted.
+#        Default:     48
+#
+
+ManaQuestOutline.MaxPerSync = 48
